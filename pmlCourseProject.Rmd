@@ -1,0 +1,144 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Philip Glaeser"
+date: "December 9, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Introduction
+Human Activity Recognition aims to recognize the actions of a person from a series of observations about the person's actions.
+Common examples include the use of devices like Jawbone Up, Nike FuelBand, and Fitbit
+to collect data about personal activity.  People regularly quantify
+how much of a particular activity they do, but rarely quantify how well they do it.
+6 participantes were asked to perform barbell lifts in the correct manner and incorrectly in 
+four other manners that are common flaws in techique. 
+
+The goal of this project is to use data from accelerometers on the belt, forearm, arm, and dumbell to build a model which can predict the manner in which they did the exercise. Each manner is represented by a different letter in the  "classe" variable in the training set.
+
+More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+## Data
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har 
+and the author thanks the owners for the use of their data.
+
+The training data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test (validation) data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The test data is really used as the final validation data.  For the
+purposes of building the model, the training data will be divided into
+training and test sets.
+
+### Required Packages
+The R environment is set up with the required packages and a
+seed is set to ensure reproducibility of the results.
+```{r eche, message=FALSE, warning=FALSE}
+library(caret)
+library(rpart)
+library(rattle)
+library(randomForest)
+set.seed(827)
+```
+
+### Data Preparation
+#### Loading
+The data from the above mention sources is downloaded to a local directory prior
+to loading into the R environment.
+```{r}
+trainI <- read.csv("pml-training.csv")
+testF <- read.csv("pml-testing.csv")
+```
+#### Cleaning
+The there are many columns where the data is either blank or "NA"
+Blanks are replaced with "NA" and then all columns where more than
+50% of the entires are "NA" are eliminated.
+```{r echo=FALSE}
+trainI[trainI==""] <- NA
+NAper <- apply(trainI, 2, function(x) sum(is.na(x)))/nrow(trainI)
+trainI <- trainI[!(NAper>0.5)]
+```
+Variables not related to exercise measurements are removed.
+```{r echo=FALSE}
+trainI <- trainI[, -(1:7)]
+```
+#### Cross-validation
+The supplied training date is split into
+a model training set (70% of data) and a model testing set (30% of data).
+The test data set supplied is really used as the final validation data.
+```{r echo=TRUE}
+inTrain <- createDataPartition(y=trainI$classe, p=0.7, list=FALSE)
+trainD <- trainI[inTrain, ]
+testD <- trainI[-inTrain, ]
+dim(trainD)
+dim(testD)
+```
+
+## Decision Tree Prediction Model
+This model is tried first as it is simple and quick
+in execution.  Unfortunately, as can be seen in the 
+output of the confusion matrix, the accuracy is only
+75.85%.  We will look at another model in hopes to 
+find a better result.   Further details on the
+Decision Tree Model are contained in the appendix.
+```{r echo=TRUE, message==FALSE}
+modFit <- rpart(classe ~ ., data=trainD, method="class")
+## print(modFit)
+## fancyRpartPlot(modFit)
+predictions <- predict(modFit, testD, type = "class")
+```
+```{r echo=TRUE}
+confusionMatrix(predictions, testD$classe)
+```
+## Random Forest Predition Model
+### Random Forest Predition Model Training
+THe training set is used to build a Random Forest model.
+The output of the model fit is shown below.  It is quite good
+with 99.39% of the samples being classified correctly.
+```{r}
+modFitRF <- randomForest(classe ~. , data=trainD)
+print(modFitRF)
+```
+### Random Forest Predition Model Testing
+As seen in the output below, the Random Forest 
+Model produces an accuracy of 99.32%, far superior
+to the Decision Tree Model.  
+```{r echo=TRUE}
+
+predictionsRF <- predict(modFitRF, testD, type = "class")
+confusionMatrix(predictionsRF, testD$classe)
+```
+### Expected Error Rates
+The in-sample error rate is 0.61%.   We would
+expect the out-of-sample error rate would be expected to
+be higher.  The goal would be that an effective model would
+capture signal and not noise.   The out-of-sample error rate
+is 0.68% which is higher than the in-sample rate.  However,
+the resulting predictions are still very close to the 
+accuracy we would expect so we can have a high degree of confidence
+in our model.
+## Results of Random Forest Model against the validation data
+The random forest model is used to predit outcomes for
+the validation data.  The results are shown below.  These results
+were ultimataly submitted for grading and turned out to
+be 100% accurate.  This is certainly in line with the predicted
+accuracy of the model, but 100% accuracy would not be expected
+on further, larger, data sets.
+```{r}
+predict(modFitRF,testF)
+```
+## Appendix
+### Further result from the Desition Tree Prediction Model
+Results of the attenpt at the tree model are shown below, both
+the raw data and a visual tree output.
+```{r echo=FALSE}
+##modFit <- rpart(classe ~ ., data=trainD, method="class")
+print(modFit)
+fancyRpartPlot(modFit)
+```
